@@ -1,10 +1,12 @@
+# Importing necessary libraries and modules
 from flask import Flask, render_template, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 import os
 import subprocess
 import yfinance as yf
 from fuzzywuzzy import process
-import sys,json
+import sys
+import json
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
@@ -12,26 +14,24 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import requests
-import json
 from twilio.rest import Client
 import threading
 import time
 
-
+# Create a Flask application instance
 app = Flask(__name__)
 
-# twilio keys ! check in their website
+# Twilio account SID and authentication token
 account_sid = '654651645165545'
 auth_token = "4465498644464467"
 
-
-# Create a Twilio client object
+# Create a Twilio client object for sending SMS
 client = Client(account_sid, auth_token)
 
-# apiurl for the news API
+# URL for the news API
 apiurl = "xoxoxoxooxoxoxo.api.keys.com.check.the.website"
 
-# Function to send SMS
+# Function to send an SMS with the article title
 def send_sms(article_title):
     message = client.messages.create(
         body=article_title,
@@ -40,69 +40,68 @@ def send_sms(article_title):
     )
     print(f"Message sent with SID: {message.sid}")
 
-# Function to check for new news and send SMS
+# Function to check for new news and send SMS if new articles are found
 def check_news():
     last_total_results = 0
 
     while True:
-        response = requests.get(apiurl).text
-        response_json = json.loads(response)
-        total_results = response_json.get('totalResults', 0)
+        response = requests.get(apiurl).text  # Send a request to the news API
+        response_json = json.loads(response)  # Load the JSON response
+        total_results = response_json.get('totalResults', 0)  # Get total results from the API
         
-        if total_results > last_total_results:
+        if total_results > last_total_results:  # Check if there are new articles
             articles = response_json['articles']
             for article in articles:
-                send_sms(article['title'])
-            last_total_results = total_results
+                send_sms(article['title'])  # Send SMS for each new article
+            last_total_results = total_results  # Update the count of total results
         
         time.sleep(60)  # Wait for 1 minute before checking again
 
-# Background thread to run the check_news function
+# Start a background thread to run the check_news function
 def start_background_task():
-    thread = threading.Thread(target=check_news)
-    thread.daemon = True
-    thread.start()
+    thread = threading.Thread(target=check_news)  # Create a new thread for the check_news function
+    thread.daemon = True  # Daemonize the thread
+    thread.start()  # Start the thread
 
 @app.route("/")
 def index():
-    return "News monitoring and SMS service is running."
+    return "News monitoring and SMS service is running."  # Simple message for the root route
 
+# Load stock tickers from a JSON file
 def load_tickers_from_json(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
-        tickers = json.load(file)
+        tickers = json.load(file)  # Load the JSON content
     return tickers
 
-# a json with tickers
+# Load Nifty 50 stock tickers from a JSON file
 nifty50_tickers = load_tickers_from_json(r'C:\Users\Desktop\flask_website\stocks_ticker.json')
 
+# Function to search for the best matching ticker
 def search_ticker(stock_name):
-    best_match, _ = process.extractOne(stock_name.upper(), nifty50_tickers.keys())
-    return nifty50_tickers[best_match]
+    best_match, _ = process.extractOne(stock_name.upper(), nifty50_tickers.keys())  # Use fuzzy matching
+    return nifty50_tickers[best_match]  # Return the best match
 
+# Function to get the current market price of a stock
 def get_current_market_price(stock_name_or_ticker):
-    # Fetch the ticker symbol
-    ticker = nifty50_tickers.get(stock_name_or_ticker.upper(), search_ticker(stock_name_or_ticker))
-    stock = yf.Ticker(ticker)
+    ticker = nifty50_tickers.get(stock_name_or_ticker.upper(), search_ticker(stock_name_or_ticker))  # Get the ticker symbol
+    stock = yf.Ticker(ticker)  # Create a Ticker object for the stock
 
     # Get real-time market data
-    current_price = stock.history(period="1d")['Close'][0]
-    current_price = round(current_price, 2)
+    current_price = stock.history(period="1d")['Close'][0]  # Get the closing price for today
+    current_price = round(current_price, 2)  # Round to 2 decimal places
 
-    # Get the previous close price
-    previous_close = stock.info['previousClose']
+    previous_close = stock.info['previousClose']  # Get the previous close price
 
-    # Calculate today's gains (Current Price - Previous Close)
-    todays_gains = round(current_price - previous_close, 2)
+    todays_gains = round(current_price - previous_close, 2)  # Calculate today's gains
 
-    # Get volume (real-time market data)
-    volume = stock.info['volume']
+    volume = stock.info['volume']  # Get the trading volume
 
-    # Get analyst ratings (buy, hold, sell recommendations)
-    analyst_ratings = stock.recommendations.tail(1)  # Get the most recent analyst rating
+    # Get the most recent analyst rating
+    analyst_ratings = stock.recommendations.tail(1)  
     if not analyst_ratings.empty and 'To Grade' in analyst_ratings.columns:
-        rating_summary = analyst_ratings['To Grade'].values[0]
+        rating_summary = analyst_ratings['To Grade'].values[0]  # Get the rating
     else:
-        rating_summary = "N/A"
+        rating_summary = "N/A"  # Default if no rating available
 
     # Get price targets
     target_high_price = stock.info.get('targetHighPrice', 'N/A')
@@ -114,8 +113,7 @@ def get_current_market_price(stock_name_or_ticker):
         "Mean": target_mean_price
     }
 
-    # Return the stock name
-    stock_name = stock.info.get('shortName', 'N/A')
+    stock_name = stock.info.get('shortName', 'N/A')  # Get the stock name
 
     # Create a dictionary with all the required information
     stock_data = {
@@ -128,31 +126,29 @@ def get_current_market_price(stock_name_or_ticker):
         "Price Targets": price_targets
     }
 
-    return stock_data
+    return stock_data  # Return the stock data
 
-
-#news scrapping functin
+# Function to scrape news from a website
 def scrape_news():
-    # Set up the WebDriver
-    options = Options()
-    options.add_argument("--headless")
+    options = Options()  # Set up the WebDriver options
+    options.add_argument("--headless")  # Run in headless mode
 
-    driver = webdriver.Firefox(options=options)
-    driver.get("https://economictimes.indiatimes.com/markets/stocks/news")
+    driver = webdriver.Firefox(options=options)  # Create a WebDriver instance
+    driver.get("https://economictimes.indiatimes.com/markets/stocks/news")  # Navigate to the news page
 
     # Wait for the page to load and news items to be present
     try:
         WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "eachStory"))
+            EC.presence_of_element_located((By.CLASS_NAME, "eachStory"))  # Wait until news items are loaded
         )
     except Exception as e:
         print(f"error")
-        driver.quit()
+        driver.quit()  # Close the WebDriver
         return []
 
     # Use Selenium to get the page source after all dynamic content is loaded
     html = driver.page_source
-    driver.quit()
+    driver.quit()  # Close the WebDriver
 
     # Parse the HTML with BeautifulSoup
     soup = BeautifulSoup(html, 'html.parser')
@@ -160,24 +156,24 @@ def scrape_news():
     # Find all news items by class name
     news_items = soup.find_all('div', class_='eachStory')
 
-    news_data = []
+    news_data = []  # Initialize a list to hold news data
 
     for item in news_items:
         try:
             # Extract the title and URL
             title_element = item.find('h3').find('a')
-            title = title_element.text.strip()
-            url = title_element['href']
+            title = title_element.text.strip()  # Get the title text
+            url = title_element['href']  # Get the article URL
 
             # Extract the time
             time_element = item.find('time')
-            publish_time = time_element.text.strip()
+            publish_time = time_element.text.strip()  # Get the publish time
 
             # Extract the paragraph description
             description_element = item.find('p')
-            description = description_element.text.strip()
+            description = description_element.text.strip()  # Get the description text
 
-            # Append data to list
+            # Append data to the list
             news_data.append({
                 "title": title,
                 "url": url,
@@ -186,138 +182,35 @@ def scrape_news():
             })
 
         except Exception as e:
-            print(f"An error occurred while processing an item: {str(e)}")
+            print(f"An error occurred while processing an item: {str(e)}")  # Handle any exceptions
 
-    return news_data
+    return news_data  # Return the scraped news data
 
-#this will give the indices value for nav bar
+# Function to get the index values for the navigation bar
 def get_index_values():
     indices = {
-        'Nifty 50': yf.Ticker('^NSEI').history(period='1d')['Close'][0],
-        'India VIX': yf.Ticker('^INDIAVIX').history(period='1d')['Close'][0],
-        'Bank Nifty': yf.Ticker('^NSEBANK').history(period='1d')['Close'][0]
+        'Nifty 50': yf.Ticker('^NSEI').history(period='1d')['Close'][0],  # Get Nifty 50 value
+        'India VIX': yf.Ticker('^INDIAVIX').history(period='1d')['Close'][0],  # Get India VIX value
+        'Bank Nifty': yf.Ticker('^NSEBANK').history(period='1d')['Close'][0]  # Get Bank Nifty value
     }
-    return indices
+    return indices  # Return the indices values
 
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///stock.db"
+# Configure the database
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///stock.db"  # Set the URI for the main database
 app.config["SQLALCHEMY_BINDS"] = {
-    'news_db': 'sqlite:///new.db'}
+    'news_db': 'sqlite:///new.db'  # Set the URI for the news database
+}
 
-db = SQLAlchemy(app)
+db = SQLAlchemy(app)  # Create a SQLAlchemy object for database operations
 
-
-
-# here i am defining the database
+# Define the Todo model for storing stock data
 class Todo(db.Model):
-    sno = db.Column(db.Integer, primary_key=True)
-    stock = db.Column(db.String(500), nullable=False)
-    cmp = db.Column(db.Integer, nullable=False)
-    news = db.Column(db.Integer, nullable=True)
-    previous_close = db.Column(db.Float, nullable=False)
-    todays_gains = db.Column(db.Float, nullable=False)
-    volume = db.Column(db.Integer, nullable=False)
-    analyst_ratings = db.Column(db.String(500), nullable=False)
-    price_targets = db.Column(db.String(500), nullable=True)
-    def __repr__(self) -> str:
-        return f"{self.sno} - {self.news}"
-
-#this is the news database
-class News(db.Model):
-    __bind_key__ = 'news_db'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(500), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    date = db.Column(db.String(100), nullable=False)
-    
-    def __repr__(self) -> str:
-        return f"{self.title} - {self.date}"
-    
-
-
-# Check if the database exists before creating it
-if not os.path.exists('stock.db'):
-    with app.app_context():
-        db.create_all()
-
-if not os.path.exists('new.db'):
-    with app.app_context():
-        db.create_all()
-
-
-# Static websites
-@app.route('/', methods=['GET', 'POST'])
-
-#this is where i am entering the data
-def home():
-    # This is making the form work
-    if request.method == 'POST':
-        reqstock = request.form['stock']
-        data = get_current_market_price(reqstock)
-        print(data["Stock Name"])
-        todo = Todo(
-            stock=data["Stock Name"], 
-            cmp=data["Current Price"], 
-            news="N/A",  # or another value if you want to store news data here
-            previous_close=data["Previous Close"],
-            todays_gains=data["Today's Gains"],
-            volume=data["Volume"],
-            analyst_ratings=data["Analyst Ratings"],
-            price_targets=data["Price Targets"]["Mean"])   
-        db.session.add(todo)
-        db.session.commit()
-        return redirect("/")
-
-    alltodo = Todo.query.all()
-    indices = get_index_values()
-    return render_template('index.html', alltodo=alltodo,indices=indices)
-
-
-
-
-
-
-# Route for News operations
-@app.route('/news')
-def news():
-    start_background_task()
-    # Run the scraper script
-    # Fetch the latest news data from the database
-    news_data = scrape_news()
-    # all_news = News.query.all() #might be a mistake here
-    return render_template('news.html', all_news=news_data)
-
-    
-# New route to handle SMS sending
-@app.route('/sms')
-def sms():
-    # file1.py
-    with open('chart.py') as f:
-        code = f.read()
-        exec(code)
-
-    return redirect('/')  # Redirect back to the news page after sending the SMS
-
-
-
-
-
-
-
-
-
-
-
-
-
-#this is for remove function, so no changes
-@app.route('/remove/<int:sno>')
-def remove(sno):
-    todo = Todo.query.filter_by(sno=sno).first()
-    if todo:
-        db.session.delete(todo)
-        db.session.commit()
-    return redirect("/")
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    sno = db.Column(db.Integer, primary_key=True)  # Serial number (primary key)
+    stock = db.Column(db.String(500), nullable=False)  # Stock name
+    cmp = db.Column(db.Integer, nullable=False)  # Current market price
+    news = db.Column(db.Integer, nullable=True)  # News ID (nullable)
+    previous_close = db.Column(db.Float, nullable=False)  # Previous close price
+    todays_gains = db.Column(db.Float, nullable=False)  # Today's gains
+    volume = db.Column(db.Integer, nullable=False)  # Trading volume
+    analyst_ratings = db.Column(db.String(500), nullable=False)  # Analyst ratings
+    price_targets = db.Column(db.String(500),
