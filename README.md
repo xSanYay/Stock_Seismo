@@ -22,4 +22,5 @@ To implement it yourself, please feel free to contact me
 - Receive SMS notifications for the latest stock market news.
 - User-friendly web interface for interacting with the application.
 
-![web_ui](https://github.com/user-attachments/assets/038090b8-55af-47b9-bbc9-c0bbba7a2abe)
+![web_ui (2)](https://github.com/user-attachments/assets/efba839e-52d8-4f53-9f90-fee684390054)
+
