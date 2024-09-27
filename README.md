@@ -1,5 +1,5 @@
 # This is a python program for the custom stock market watchlist! 
-To implement it yourself, please feel free to contact me
+For any help, please feel free to contact me!
 
 ## Technologies Used
 
