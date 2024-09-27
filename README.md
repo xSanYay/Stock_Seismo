@@ -3,6 +3,7 @@ To implement it yourself, please feel free to contact me
 
 ## Technologies Used
 
+
 - **Flask**: A lightweight web framework for building the web application.
 - **Flask-SQLAlchemy**: An Object-Relational Mapping (ORM) tool for database management with SQLite.
 - **Twilio**: API for sending SMS notifications to users.
@@ -20,3 +21,5 @@ To implement it yourself, please feel free to contact me
 - Monitor stock prices and get current market data.
 - Receive SMS notifications for the latest stock market news.
 - User-friendly web interface for interacting with the application.
+
+![web_ui](https://github.com/user-attachments/assets/038090b8-55af-47b9-bbc9-c0bbba7a2abe)
